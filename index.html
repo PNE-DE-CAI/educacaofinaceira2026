@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Banco Escolar · Créditos Educacionais</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f4f8; min-height: 100vh; padding: 20px; color: #1e2a3e; }
+        :root { --azul-suave: #eef2fa; --azul-destaque: #2c5f8a; --vermelho: #c0392b; --branco: #ffffff; --preto: #1e2a3e; --cinza-borda: #dce4ec; }
+        .dashboard-container { max-width: 1400px; margin: 0 auto; background: var(--branco); border-radius: 48px; padding: 20px; box-shadow: 0 20px 35px rgba(0,0,0,0.05); border: 1px solid var(--cinza-borda); }
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--azul-destaque); color: white; padding: 12px 24px; border-radius: 60px; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo-area img { max-height: 50px; width: auto; background: white; border-radius: 12px; padding: 4px; }
+        .logo-area span { font-size: 1.2rem; font-weight: 600; color: #ffec9e; }
+        .user-info { background: #1e4663; padding: 6px 18px; border-radius: 40px; color: white; display: flex; align-items: center; gap: 12px; }
+        .btn-logout { background: var(--vermelho); border: none; padding: 5px 12px; border-radius: 40px; color: white; cursor: pointer; font-weight: 600; }
+        .card { background: var(--branco); border-radius: 32px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid var(--cinza-borda); }
+        .card h2 { color: var(--azul-destaque); border-left: 4px solid var(--vermelho); padding-left: 1rem; margin-bottom: 1.2rem; font-size: 1.5rem; }
+        .grid-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        input, select { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid var(--cinza-borda); font-family: 'Inter', sans-serif; margin: 5px 0; background: white; }
+        button { background: linear-gradient(135deg, var(--azul-destaque), #1e4663); border: none; padding: 10px 20px; border-radius: 40px; color: white; font-weight: 600; cursor: pointer; transition: 0.1s linear; margin: 5px 0; }
+        button:active { transform: translateY(2px); }
+        .btn-danger { background: linear-gradient(135deg, #c0392b, #a93226); }
+        .btn-success { background: linear-gradient(135deg, #27ae60, #1e8449); }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; overflow-x: auto; display: block; }
+        th, td { border: 1px solid var(--cinza-borda); padding: 8px; text-align: left; }
+        th { background: var(--azul-destaque); color: white; }
+        .saldo { font-size: 2rem; font-weight: 800; color: var(--vermelho); }
+        .transacao { font-size: 0.9rem; border-bottom: 1px solid #ecf0f1; padding: 8px 0; }
+        @media (max-width: 700px) { .dashboard-container { padding: 12px; } .grid-forms { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="dashboard-container" id="app">
+    <div class="header">
+        <div class="logo-area">
+            <img src="https://i.ibb.co/0p01LzxB/logo3de.jpg" alt="Logo">
+            <span>Banco Escolar</span>
+        </div>
+        <div class="user-info" id="userInfo">
+            <span id="userNameDisplay"></span>
+            <button id="logoutBtn" class="btn-logout">Sair</button>
+        </div>
+    </div>
+
+    <div id="loginPanel">
+        <div class="card" style="max-width: 500px; margin: 0 auto;">
+            <h2>💰 Acesso ao Banco Escolar</h2>
+            <div style="margin-bottom: 20px;">
+                <button id="showProfessorLoginBtn" class="btn-success">Sou Professor</button>
+                <button id="showStudentLoginBtn">Sou Aluno (Matrícula)</button>
+            </div>
+            <div id="professorLoginForm" style="display: none;">
+                <input type="email" id="profEmail" placeholder="E-mail institucional">
+                <input type="password" id="profPassword" placeholder="Senha">
+                <button id="profLoginBtn">Entrar</button>
+                <button id="profSignupBtn">Cadastrar Professor</button>
+            </div>
+            <div id="studentLoginForm" style="display: none;">
+                <input type="text" id="studentMatricula" placeholder="Digite sua matrícula">
+                <button id="studentLoginBtn">Ver Meus Créditos</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="professorPanel" style="display: none;">
+        <div class="card">
+            <h2><i class="fas fa-chalkboard-user"></i> Gestão de Alunos e Saldo</h2>
+            <div class="grid-forms">
+                <div>
+                    <h3>➕ Cadastrar Aluno</h3>
+                    <input type="text" id="matricula" placeholder="Matrícula">
+                    <input type="text" id="nome" placeholder="Nome">
+                    <select id="escola"><option value="">Escola</option></select>
+                    <select id="turma"><option value="">Turma</option></select>
+                    <button id="addStudentBtn">Salvar</button>
+                </div>
+                <div>
+                    <h3>💸 Atribuir/Remover Créditos</h3>
+                    <select id="selectStudentCred"></select>
+                    <input type="number" id="valorCredito" placeholder="Quantidade (ex: 100)">
+                    <select id="tipoTransacao">
+                        <option value="credito">Adicionar (+) Créditos</option>
+                        <option value="debito">Remover (-) Créditos</option>
+                    </select>
+                    <button id="applyCreditBtn">Aplicar</button>
+                </div>
+                <div>
+                    <h3>📂 Importar CSV</h3>
+                    <p>Colunas: matricula, nome, escola, turma</p>
+                    <input type="file" id="csvFile" accept=".csv">
+                    <button id="importCsvBtn">Importar</button>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="studentsTable">
+                    <thead><tr><th>Matrícula</th><th>Nome</th><th>Escola</th><th>Turma</th><th>Saldo</th><th>Ações</th></tr></thead>
+                    <tbody id="studentsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h2><i class="fas fa-history"></i> Extrato Recente</h2>
+            <div id="extratoGlobal"></div>
+        </div>
+    </div>
+
+    <div id="studentPanel" style="display: none;">
+        <div class="card">
+            <h2><i class="fas fa-wallet"></i> Meu Saldo</h2>
+            <div class="saldo" id="meuSaldo">0</div>
+            <div class="progress-bar" style="margin-top:10px;"><div class="progress-fill" id="progressoGasto" style="width:0%; height:6px; background:var(--vermelho); border-radius:3px;"></div></div>
+        </div>
+        <div class="card">
+            <h2><i class="fas fa-shopping-cart"></i> Comprar Atividades</h2>
+            <div id="listaAtividades"></div>
+        </div>
+        <div class="card">
+            <h2><i class="fas fa-receipt"></i> Meu Extrato</h2>
+            <div id="extratoAluno"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ==================== CONFIGURAÇÃO SUPABASE ====================
+        const SUPABASE_URL = 'https://bkydyeighbcaabledgxj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aO9_8D0TQTyXBjteTXORQQ_hDZQa91z';
+        // =================================================================
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let currentStudentId = null;
+
+        const loginPanel = document.getElementById('loginPanel');
+        const professorPanel = document.getElementById('professorPanel');
+        const studentPanel = document.getElementById('studentPanel');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+
+        // Listas para selects
+        const escolasList = [
+            "E.E. ADAIL JARBAS DUCLOS", "E.E. AFONSO MORENO", "E.E. ALADINO POLON", "E.E. ALBERTO GRAF – CAPITÃO",
+            "E.E. ALBINO FIORE", "E.E. ALFRIED THEODOR WEISZFLOG", "E.E. ANA MARIA GARRIDO ORLANDIN – PROF.ª"
+        ];
+        const turmasList = ["A", "B", "C", "D", "E", "G", "H", "I"];
+
+        function populateSelects() {
+            const escolaSelect = document.getElementById('escola');
+            escolasList.forEach(e => { let opt = document.createElement('option'); opt.value = e; opt.textContent = e; escolaSelect.appendChild(opt); });
+            const turmaSelect = document.getElementById('turma');
+            turmasList.forEach(t => { let opt = document.createElement('option'); opt.value = t; opt.textContent = t; turmaSelect.appendChild(opt); });
+        }
+
+        async function carregarAlunos() {
+            if (!currentUser || currentUser.role !== 'professor') return;
+            const { data, error } = await supabase.from('banco_alunos').select('*').order('nome');
+            if (error) { alert('Erro: ' + error.message); return; }
+            renderTabelaAlunos(data || []);
+            atualizarSelectAlunos(data || []);
+        }
+
+        function renderTabelaAlunos(alunos) {
+            const tbody = document.getElementById('studentsTableBody');
+            tbody.innerHTML = '';
+            alunos.forEach(aluno => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = aluno.matricula;
+                row.insertCell(1).innerText = aluno.nome;
+                row.insertCell(2).innerText = aluno.escola;
+                row.insertCell(3).innerText = aluno.turma;
+                row.insertCell(4).innerHTML = `<span style="font-weight:bold;color:#c0392b;">${aluno.saldo} créditos</span>`;
+                const actions = row.insertCell(5);
+                const delBtn = document.createElement('button'); delBtn.innerText = '🗑️'; delBtn.className = 'btn-danger'; delBtn.style.padding = '4px 12px';
+                delBtn.onclick = () => deletarAluno(aluno.id);
+                actions.appendChild(delBtn);
+            });
+        }
+
+        function atualizarSelectAlunos(alunos) {
+            const select = document.getElementById('selectStudentCred');
+            select.innerHTML = '<option value="">Selecione um aluno</option>';
+            alunos.forEach(a => { let opt = document.createElement('option'); opt.value = a.id; opt.textContent = `${a.nome} (${a.matricula}) - Saldo: ${a.saldo}`; select.appendChild(opt); });
+        }
+
+        async function adicionarAluno(matricula, nome, escola, turma) {
+            const { error } = await supabase.from('banco_alunos').insert([{ matricula, nome, escola, turma, saldo: 0 }]);
+            if (error) alert('Erro: ' + error.message);
+            else carregarAlunos();
+        }
+
+        async function deletarAluno(id) {
+            if (confirm('Remover aluno?')) {
+                await supabase.from('banco_alunos').delete().eq('id', id);
+                carregarAlunos();
+            }
+        }
+
+        async function registrarTransacao(alunoId, valor, descricao, tipo) {
+            const { data: aluno } = await supabase.from('banco_alunos').select('saldo').eq('id', alunoId).single();
+            if (!aluno) return;
+            let novoSaldo = aluno.saldo + valor;
+            if (novoSaldo < 0) { alert('Saldo insuficiente'); return false; }
+            const { error: updateError } = await supabase.from('banco_alunos').update({ saldo: novoSaldo }).eq('id', alunoId);
+            if (updateError) { alert('Erro ao atualizar saldo'); return false; }
+            const { error: transError } = await supabase.from('banco_transacoes').insert([{ aluno_id: alunoId, valor, descricao, tipo, created_at: new Date() }]);
+            if (transError) alert('Erro ao registrar transação');
+            return true;
+        }
+
+        async function aplicarCredito() {
+            const alunoId = document.getElementById('selectStudentCred').value;
+            const valor = parseInt(document.getElementById('valorCredito').value);
+            const tipo = document.getElementById('tipoTransacao').value;
+            if (!alunoId || isNaN(valor) || valor <= 0) { alert('Selecione aluno e valor válido'); return; }
+            const valorFinal = tipo === 'credito' ? valor : -valor;
+            const descricao = tipo === 'credito' ? 'Depósito de créditos' : 'Retirada de créditos';
+            const sucesso = await registrarTransacao(parseInt(alunoId), valorFinal, descricao, tipo);
+            if (sucesso) {
+                carregarAlunos();
+                carregarExtratoGlobal();
+                document.getElementById('valorCredito').value = '';
+            }
+        }
+
+        async function carregarExtratoGlobal() {
+            if (!currentUser || currentUser.role !== 'professor') return;
+            const { data, error } = await supabase.from('banco_transacoes').select('*, banco_alunos(nome)').order('created_at', { ascending: false }).limit(30);
+            if (error) return;
+            const container = document.getElementById('extratoGlobal');
+            container.innerHTML = '<div style="max-height:300px; overflow-y:auto;">';
+            data.forEach(t => {
+                container.innerHTML += `<div class="transacao"><strong>${t.banco_alunos?.nome || 'Aluno'}</strong> - ${t.tipo === 'credito' ? '+' : '-'}${t.valor} créditos: ${t.descricao} (${new Date(t.created_at).toLocaleString()})</div>`;
+            });
+            container.innerHTML += '</div>';
+        }
+
+        async function importarCSV(file) {
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async (results) => {
+                    for (let row of results.data) {
+                        if (!row.matricula || !row.nome) continue;
+                        await supabase.from('banco_alunos').insert([{ matricula: row.matricula, nome: row.nome, escola: row.escola, turma: row.turma, saldo: 0 }]);
+                    }
+                    alert('Importação concluída');
+                    carregarAlunos();
+                }
+            });
+        }
+
+        // ================== ÁREA DO ALUNO ==================
+        async function carregarDadosAluno(id) {
+            const { data: aluno } = await supabase.from('banco_alunos').select('*').eq('id', id).single();
+            if (!aluno) return;
+            document.getElementById('meuSaldo').innerText = `${aluno.saldo} créditos`;
+            const totalGasto = aluno.total_gasto || 0;
+            const progresso = Math.min(100, (totalGasto / 1000) * 100);
+            document.getElementById('progressoGasto').style.width = `${progresso}%`;
+
+            // Atividades disponíveis
+            const atividades = [
+                { id: 1, nome: "⚡ Desafio Rápido (10 questões)", custo: 50, descricao: "Responda 10 questões de múltipla escolha" },
+                { id: 2, nome: "📚 Pacote de Estudos (Matemática)", custo: 100, descricao: "Acesso a videoaulas e exercícios" },
+                { id: 3, nome: "🎮 Game Educativo: Missão Proficiência", custo: 200, descricao: "Jogo interativo de matemática" },
+                { id: 4, nome: "🏆 Simulado SAEB Completo", custo: 300, descricao: "Simulado com correção instantânea" }
+            ];
+            const listaDiv = document.getElementById('listaAtividades');
+            listaDiv.innerHTML = '';
+            for (let ativ of atividades) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.padding = '1rem';
+                card.innerHTML = `<h3>${ativ.nome}</h3><p>${ativ.descricao}</p><p><strong>Custo: ${ativ.custo} créditos</strong></p><button class="comprarBtn" data-id="${ativ.id}" data-custo="${ativ.custo}">Comprar</button>`;
+                listaDiv.appendChild(card);
+            }
+            document.querySelectorAll('.comprarBtn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const custo = parseInt(btn.dataset.custo);
+                    if (aluno.saldo >= custo) {
+                        const sucesso = await registrarTransacao(id, -custo, `Compra: ${btn.parentElement.querySelector('h3').innerText}`, 'debito');
+                        if (sucesso) {
+                            await supabase.from('banco_alunos').update({ total_gasto: (aluno.total_gasto || 0) + custo }).eq('id', id);
+                            carregarDadosAluno(id);
+                            carregarExtratoAluno(id);
+                            alert('Compra realizada com sucesso! Acesse a atividade no seu e-mail.');
+                        }
+                    } else {
+                        alert('Saldo insuficiente!');
+                    }
+                });
+            });
+            await carregarExtratoAluno(id);
+        }
+
+        async function carregarExtratoAluno(id) {
+            const { data, error } = await supabase.from('banco_transacoes').select('*').eq('aluno_id', id).order('created_at', { ascending: false });
+            if (error) return;
+            const container = document.getElementById('extratoAluno');
+            container.innerHTML = '<div style="max-height:300px; overflow-y:auto;">';
+            data.forEach(t => {
+                container.innerHTML += `<div class="transacao">${t.tipo === 'credito' ? '+' : '-'}${t.valor} créditos: ${t.descricao} (${new Date(t.created_at).toLocaleString()})</div>`;
+            });
+            container.innerHTML += '</div>';
+        }
+
+        // ================== AUTENTICAÇÃO ==================
+        async function professorLogin(email, password) {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) { alert('Login falhou: ' + error.message); return false; }
+            currentUser = { role: 'professor', id: data.user.id, email };
+            userNameDisplay.innerText = `Professor: ${email}`;
+            return true;
+        }
+        async function professorSignup(email, password) {
+            const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+            if (error) { alert('Cadastro falhou: ' + error.message); return false; }
+            alert('Cadastro realizado! Agora faça login.');
+            return true;
+        }
+        async function studentLogin(matricula) {
+            const { data, error } = await supabase.from('banco_alunos').select('*').eq('matricula', matricula);
+            if (error || !data || data.length === 0) { alert('Matrícula não encontrada'); return false; }
+            const aluno = data[0];
+            currentUser = { role: 'student', id: aluno.id, nome: aluno.nome };
+            userNameDisplay.innerText = `Aluno: ${aluno.nome}`;
+            currentStudentId = aluno.id;
+            await carregarDadosAluno(aluno.id);
+            return true;
+        }
+
+        // ================== EVENTOS ==================
+        document.getElementById('showProfessorLoginBtn').onclick = () => {
+            document.getElementById('professorLoginForm').style.display = 'block';
+            document.getElementById('studentLoginForm').style.display = 'none';
+        };
+        document.getElementById('showStudentLoginBtn').onclick = () => {
+            document.getElementById('professorLoginForm').style.display = 'none';
+            document.getElementById('studentLoginForm').style.display = 'block';
+        };
+        document.getElementById('profLoginBtn').onclick = async () => {
+            const email = document.getElementById('profEmail').value;
+            const pass = document.getElementById('profPassword').value;
+            if (await professorLogin(email, pass)) {
+                loginPanel.style.display = 'none';
+                professorPanel.style.display = 'block';
+                studentPanel.style.display = 'none';
+                carregarAlunos();
+                carregarExtratoGlobal();
+            }
+        };
+        document.getElementById('profSignupBtn').onclick = async () => {
+            const email = document.getElementById('profEmail').value;
+            const pass = document.getElementById('profPassword').value;
+            await professorSignup(email, pass);
+        };
+        document.getElementById('studentLoginBtn').onclick = async () => {
+            const mat = document.getElementById('studentMatricula').value;
+            if (await studentLogin(mat)) {
+                loginPanel.style.display = 'none';
+                professorPanel.style.display = 'none';
+                studentPanel.style.display = 'block';
+            }
+        };
+        document.getElementById('logoutBtn').onclick = () => {
+            currentUser = null;
+            loginPanel.style.display = 'block';
+            professorPanel.style.display = 'none';
+            studentPanel.style.display = 'none';
+            supabase.auth.signOut();
+        };
+        document.getElementById('addStudentBtn').onclick = async () => {
+            const mat = document.getElementById('matricula').value.trim();
+            const nome = document.getElementById('nome').value.trim();
+            const escola = document.getElementById('escola').value;
+            const turma = document.getElementById('turma').value;
+            if (!mat || !nome || !escola || !turma) { alert('Preencha todos os campos'); return; }
+            await adicionarAluno(mat, nome, escola, turma);
+            document.getElementById('matricula').value = '';
+            document.getElementById('nome').value = '';
+        };
+        document.getElementById('applyCreditBtn').onclick = aplicarCredito;
+        document.getElementById('importCsvBtn').onclick = () => {
+            const file = document.getElementById('csvFile').files[0];
+            if (file) importarCSV(file);
+            else alert('Selecione um arquivo CSV');
+        };
+
+        populateSelects();
+        loginPanel.style.display = 'block';
+        professorPanel.style.display = 'none';
+        studentPanel.style.display = 'none';
+    })();
+</script>
+</body>
+</html>
