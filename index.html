@@ -32,7 +32,10 @@
         th { background: var(--azul-destaque); color: white; }
         .saldo { font-size: 2rem; font-weight: 800; color: var(--vermelho); }
         .transacao { font-size: 0.9rem; border-bottom: 1px solid #ecf0f1; padding: 8px 0; }
-        @media (max-width: 700px) { .dashboard-container { padding: 12px; } .grid-forms { grid-template-columns: 1fr; } }
+        .filtros { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .progress-bar { background: #e0e0e0; border-radius: 30px; height: 12px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { background: var(--vermelho); width: 0%; height: 100%; border-radius: 30px; transition: width 0.3s; }
+        @media (max-width: 700px) { .dashboard-container { padding: 12px; } .grid-forms { grid-template-columns: 1fr; } .filtros { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -77,6 +80,7 @@
                     <input type="text" id="matricula" placeholder="Matrícula">
                     <input type="text" id="nome" placeholder="Nome">
                     <select id="escola"><option value="">Escola</option></select>
+                    <select id="serie"><option value="">Série/Ano</option></select>
                     <select id="turma"><option value="">Turma</option></select>
                     <button id="addStudentBtn">Salvar</button>
                 </div>
@@ -92,14 +96,21 @@
                 </div>
                 <div>
                     <h3>📂 Importar CSV</h3>
-                    <p>Colunas: matricula, nome, escola, turma</p>
+                    <p>Colunas: matricula, nome, escola, serie, turma</p>
                     <input type="file" id="csvFile" accept=".csv">
                     <button id="importCsvBtn">Importar</button>
                 </div>
             </div>
+            <div class="filtros">
+                <select id="filterEscola"><option value="">Todas as escolas</option></select>
+                <select id="filterSerie"><option value="">Todas as séries</option></select>
+                <select id="filterTurma"><option value="">Todas as turmas</option></select>
+                <button id="applyFiltersBtn">Filtrar</button>
+                <button id="clearFiltersBtn">Limpar Filtros</button>
+            </div>
             <div style="overflow-x: auto;">
                 <table id="studentsTable">
-                    <thead><tr><th>Matrícula</th><th>Nome</th><th>Escola</th><th>Turma</th><th>Saldo</th><th>Ações</th></tr></thead>
+                    <thead><tr><th>Matrícula</th><th>Nome</th><th>Escola</th><th>Série</th><th>Turma</th><th>Saldo</th><th>Total Gasto</th><th>Ações</th></tr></thead>
                     <tbody id="studentsTableBody"></tbody>
                 </table>
             </div>
@@ -114,7 +125,9 @@
         <div class="card">
             <h2><i class="fas fa-wallet"></i> Meu Saldo</h2>
             <div class="saldo" id="meuSaldo">0</div>
-            <div class="progress-bar" style="margin-top:10px;"><div class="progress-fill" id="progressoGasto" style="width:0%; height:6px; background:var(--vermelho); border-radius:3px;"></div></div>
+            <p><strong>Total gasto até agora:</strong> <span id="totalGasto">0</span> créditos</p>
+            <div class="progress-bar"><div class="progress-fill" id="progressoGasto"></div></div>
+            <p class="small">Meta: 1000 créditos gastos = ⭐ Nível máximo</p>
         </div>
         <div class="card">
             <h2><i class="fas fa-shopping-cart"></i> Comprar Atividades</h2>
@@ -130,8 +143,8 @@
 <script>
     (function() {
         // ==================== CONFIGURAÇÃO SUPABASE ====================
-        const SUPABASE_URL = 'https://lrdpkddpmagneqhntrit.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_RcvpMCKk0YX6IFivTRuBLg_wpG4E4v4';
+        const SUPABASE_URL = 'https://bkydyeighbcaabledgxj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aO9_8D0TQTyXBjteTXORQQ_hDZQa91z';
         // =================================================================
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -147,23 +160,41 @@
         // Listas para selects
         const escolasList = [
             "E.E. ADAIL JARBAS DUCLOS", "E.E. AFONSO MORENO", "E.E. ALADINO POLON", "E.E. ALBERTO GRAF – CAPITÃO",
-            "E.E. ALBINO FIORE", "E.E. ALFRIED THEODOR WEISZFLOG", "E.E. ANA MARIA GARRIDO ORLANDIN – PROF.ª"
+            "E.E. ALBINO FIORE", "E.E. ALFRIED THEODOR WEISZFLOG", "E.E. ANA MARIA GARRIDO ORLANDIN – PROF.ª",
+            "E.E. APARECIDO ROBERTO TONELLOTTI – PROF.", "E.E. ARMANDO SESTINI", "E.E. ARTHUR WEINGRILL"
         ];
+        const seriesList = ["6º Ano", "7º Ano", "8º Ano", "9º Ano", "1ª Série EM", "2ª Série EM", "3ª Série EM"];
         const turmasList = ["A", "B", "C", "D", "E", "G", "H", "I"];
 
         function populateSelects() {
             const escolaSelect = document.getElementById('escola');
             escolasList.forEach(e => { let opt = document.createElement('option'); opt.value = e; opt.textContent = e; escolaSelect.appendChild(opt); });
+            const serieSelect = document.getElementById('serie');
+            seriesList.forEach(s => { let opt = document.createElement('option'); opt.value = s; opt.textContent = s; serieSelect.appendChild(opt); });
             const turmaSelect = document.getElementById('turma');
             turmasList.forEach(t => { let opt = document.createElement('option'); opt.value = t; opt.textContent = t; turmaSelect.appendChild(opt); });
+
+            const filterEscola = document.getElementById('filterEscola');
+            escolasList.forEach(e => { let opt = document.createElement('option'); opt.value = e; opt.textContent = e; filterEscola.appendChild(opt); });
+            const filterSerie = document.getElementById('filterSerie');
+            seriesList.forEach(s => { let opt = document.createElement('option'); opt.value = s; opt.textContent = s; filterSerie.appendChild(opt); });
+            const filterTurma = document.getElementById('filterTurma');
+            turmasList.forEach(t => { let opt = document.createElement('option'); opt.value = t; opt.textContent = t; filterTurma.appendChild(opt); });
         }
 
-        async function carregarAlunos() {
+        let alunosList = [];
+
+        async function carregarAlunos(filters = {}) {
             if (!currentUser || currentUser.role !== 'professor') return;
-            const { data, error } = await supabase.from('banco_alunos').select('*').order('nome');
+            let query = supabase.from('banco_alunos').select('*');
+            if (filters.escola) query = query.eq('escola', filters.escola);
+            if (filters.serie) query = query.eq('serie', filters.serie);
+            if (filters.turma) query = query.eq('turma', filters.turma);
+            const { data, error } = await query.order('nome');
             if (error) { alert('Erro: ' + error.message); return; }
-            renderTabelaAlunos(data || []);
-            atualizarSelectAlunos(data || []);
+            alunosList = data || [];
+            renderTabelaAlunos(alunosList);
+            atualizarSelectAlunos(alunosList);
         }
 
         function renderTabelaAlunos(alunos) {
@@ -174,9 +205,11 @@
                 row.insertCell(0).innerText = aluno.matricula;
                 row.insertCell(1).innerText = aluno.nome;
                 row.insertCell(2).innerText = aluno.escola;
-                row.insertCell(3).innerText = aluno.turma;
-                row.insertCell(4).innerHTML = `<span style="font-weight:bold;color:#c0392b;">${aluno.saldo} créditos</span>`;
-                const actions = row.insertCell(5);
+                row.insertCell(3).innerText = aluno.serie;
+                row.insertCell(4).innerText = aluno.turma;
+                row.insertCell(5).innerHTML = `<span style="font-weight:bold;color:#c0392b;">${aluno.saldo} créditos</span>`;
+                row.insertCell(6).innerHTML = `${aluno.total_gasto || 0} créditos`;
+                const actions = row.insertCell(7);
                 const delBtn = document.createElement('button'); delBtn.innerText = '🗑️'; delBtn.className = 'btn-danger'; delBtn.style.padding = '4px 12px';
                 delBtn.onclick = () => deletarAluno(aluno.id);
                 actions.appendChild(delBtn);
@@ -189,8 +222,8 @@
             alunos.forEach(a => { let opt = document.createElement('option'); opt.value = a.id; opt.textContent = `${a.nome} (${a.matricula}) - Saldo: ${a.saldo}`; select.appendChild(opt); });
         }
 
-        async function adicionarAluno(matricula, nome, escola, turma) {
-            const { error } = await supabase.from('banco_alunos').insert([{ matricula, nome, escola, turma, saldo: 0 }]);
+        async function adicionarAluno(matricula, nome, escola, serie, turma) {
+            const { error } = await supabase.from('banco_alunos').insert([{ matricula, nome, escola, serie, turma, saldo: 0, total_gasto: 0 }]);
             if (error) alert('Erro: ' + error.message);
             else carregarAlunos();
         }
@@ -203,11 +236,13 @@
         }
 
         async function registrarTransacao(alunoId, valor, descricao, tipo) {
-            const { data: aluno } = await supabase.from('banco_alunos').select('saldo').eq('id', alunoId).single();
+            const { data: aluno } = await supabase.from('banco_alunos').select('saldo, total_gasto').eq('id', alunoId).single();
             if (!aluno) return;
             let novoSaldo = aluno.saldo + valor;
             if (novoSaldo < 0) { alert('Saldo insuficiente'); return false; }
-            const { error: updateError } = await supabase.from('banco_alunos').update({ saldo: novoSaldo }).eq('id', alunoId);
+            let novoTotalGasto = aluno.total_gasto;
+            if (tipo === 'debito') novoTotalGasto = (aluno.total_gasto || 0) + Math.abs(valor);
+            const { error: updateError } = await supabase.from('banco_alunos').update({ saldo: novoSaldo, total_gasto: novoTotalGasto }).eq('id', alunoId);
             if (updateError) { alert('Erro ao atualizar saldo'); return false; }
             const { error: transError } = await supabase.from('banco_transacoes').insert([{ aluno_id: alunoId, valor, descricao, tipo, created_at: new Date() }]);
             if (transError) alert('Erro ao registrar transação');
@@ -248,7 +283,15 @@
                 complete: async (results) => {
                     for (let row of results.data) {
                         if (!row.matricula || !row.nome) continue;
-                        await supabase.from('banco_alunos').insert([{ matricula: row.matricula, nome: row.nome, escola: row.escola, turma: row.turma, saldo: 0 }]);
+                        await supabase.from('banco_alunos').insert([{ 
+                            matricula: row.matricula, 
+                            nome: row.nome, 
+                            escola: row.escola, 
+                            serie: row.serie, 
+                            turma: row.turma, 
+                            saldo: 0, 
+                            total_gasto: 0 
+                        }]);
                     }
                     alert('Importação concluída');
                     carregarAlunos();
@@ -262,10 +305,10 @@
             if (!aluno) return;
             document.getElementById('meuSaldo').innerText = `${aluno.saldo} créditos`;
             const totalGasto = aluno.total_gasto || 0;
+            document.getElementById('totalGasto').innerText = totalGasto;
             const progresso = Math.min(100, (totalGasto / 1000) * 100);
             document.getElementById('progressoGasto').style.width = `${progresso}%`;
 
-            // Atividades disponíveis
             const atividades = [
                 { id: 1, nome: "⚡ Desafio Rápido (10 questões)", custo: 50, descricao: "Responda 10 questões de múltipla escolha" },
                 { id: 2, nome: "📚 Pacote de Estudos (Matemática)", custo: 100, descricao: "Acesso a videoaulas e exercícios" },
@@ -278,7 +321,7 @@
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.style.padding = '1rem';
-                card.innerHTML = `<h3>${ativ.nome}</h3><p>${ativ.descricao}</p><p><strong>Custo: ${ativ.custo} créditos</strong></p><button class="comprarBtn" data-id="${ativ.id}" data-custo="${ativ.custo}">Comprar</button>`;
+                card.innerHTML = `<h3>${ativ.nome}</h3><p>${ativ.descricao}</p><p><strong>Custo: ${ativ.custo} créditos</strong></p><button class="comprarBtn" data-custo="${ativ.custo}">Comprar</button>`;
                 listaDiv.appendChild(card);
             }
             document.querySelectorAll('.comprarBtn').forEach(btn => {
@@ -287,9 +330,8 @@
                     if (aluno.saldo >= custo) {
                         const sucesso = await registrarTransacao(id, -custo, `Compra: ${btn.parentElement.querySelector('h3').innerText}`, 'debito');
                         if (sucesso) {
-                            await supabase.from('banco_alunos').update({ total_gasto: (aluno.total_gasto || 0) + custo }).eq('id', id);
-                            carregarDadosAluno(id);
-                            carregarExtratoAluno(id);
+                            await carregarDadosAluno(id);
+                            await carregarExtratoAluno(id);
                             alert('Compra realizada com sucesso! Acesse a atividade no seu e-mail.');
                         }
                     } else {
@@ -380,9 +422,10 @@
             const mat = document.getElementById('matricula').value.trim();
             const nome = document.getElementById('nome').value.trim();
             const escola = document.getElementById('escola').value;
+            const serie = document.getElementById('serie').value;
             const turma = document.getElementById('turma').value;
-            if (!mat || !nome || !escola || !turma) { alert('Preencha todos os campos'); return; }
-            await adicionarAluno(mat, nome, escola, turma);
+            if (!mat || !nome || !escola || !serie || !turma) { alert('Preencha todos os campos'); return; }
+            await adicionarAluno(mat, nome, escola, serie, turma);
             document.getElementById('matricula').value = '';
             document.getElementById('nome').value = '';
         };
@@ -391,6 +434,18 @@
             const file = document.getElementById('csvFile').files[0];
             if (file) importarCSV(file);
             else alert('Selecione um arquivo CSV');
+        };
+        document.getElementById('applyFiltersBtn').onclick = () => {
+            const escola = document.getElementById('filterEscola').value;
+            const serie = document.getElementById('filterSerie').value;
+            const turma = document.getElementById('filterTurma').value;
+            carregarAlunos({ escola, serie, turma });
+        };
+        document.getElementById('clearFiltersBtn').onclick = () => {
+            document.getElementById('filterEscola').value = '';
+            document.getElementById('filterSerie').value = '';
+            document.getElementById('filterTurma').value = '';
+            carregarAlunos();
         };
 
         populateSelects();
