@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Banco Escolar · Créditos Educacionais</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,7 +11,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f0f4f8; min-height: 100vh; padding: 20px; color: #1e2a3e; }
-        :root { --azul-suave: #eef2fa; --azul-destaque: #2c5f8a; --vermelho: #c0392b; --branco: #ffffff; --preto: #1e2a3e; --cinza-borda: #dce4ec; }
+        :root { --azul-destaque: #2c5f8a; --vermelho: #c0392b; --branco: #ffffff; --cinza-borda: #dce4ec; }
         .dashboard-container { max-width: 1400px; margin: 0 auto; background: var(--branco); border-radius: 48px; padding: 20px; box-shadow: 0 20px 35px rgba(0,0,0,0.05); border: 1px solid var(--cinza-borda); }
         .header { display: flex; justify-content: space-between; align-items: center; background: var(--azul-destaque); color: white; padding: 12px 24px; border-radius: 60px; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
         .logo-area { display: flex; align-items: center; gap: 12px; }
@@ -98,7 +98,7 @@
                     <h3>📂 Importar CSV</h3>
                     <p>Colunas: matricula, nome, escola, serie, turma</p>
                     <input type="file" id="csvFile" accept=".csv">
-                    <button id="importCsvBtn">Importar</button>
+                    <button id="importCsvBtn">📤 Importar</button>
                 </div>
             </div>
             <div class="filtros">
@@ -143,6 +143,7 @@
 <script>
     (function() {
         // ==================== CONFIGURAÇÃO SUPABASE ====================
+        // ATENÇÃO: Substitua pelos seus dados!
         const SUPABASE_URL = 'https://bkydyeighbcaabledgxj.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_aO9_8D0TQTyXBjteTXORQQ_hDZQa91z';
         // =================================================================
@@ -191,7 +192,7 @@
             if (filters.serie) query = query.eq('serie', filters.serie);
             if (filters.turma) query = query.eq('turma', filters.turma);
             const { data, error } = await query.order('nome');
-            if (error) { alert('Erro: ' + error.message); return; }
+            if (error) { alert('Erro ao carregar: ' + error.message); return; }
             alunosList = data || [];
             renderTabelaAlunos(alunosList);
             atualizarSelectAlunos(alunosList);
@@ -237,15 +238,14 @@
 
         async function registrarTransacao(alunoId, valor, descricao, tipo) {
             const { data: aluno } = await supabase.from('banco_alunos').select('saldo, total_gasto').eq('id', alunoId).single();
-            if (!aluno) return;
+            if (!aluno) return false;
             let novoSaldo = aluno.saldo + valor;
             if (novoSaldo < 0) { alert('Saldo insuficiente'); return false; }
             let novoTotalGasto = aluno.total_gasto;
             if (tipo === 'debito') novoTotalGasto = (aluno.total_gasto || 0) + Math.abs(valor);
             const { error: updateError } = await supabase.from('banco_alunos').update({ saldo: novoSaldo, total_gasto: novoTotalGasto }).eq('id', alunoId);
             if (updateError) { alert('Erro ao atualizar saldo'); return false; }
-            const { error: transError } = await supabase.from('banco_transacoes').insert([{ aluno_id: alunoId, valor, descricao, tipo, created_at: new Date() }]);
-            if (transError) alert('Erro ao registrar transação');
+            await supabase.from('banco_transacoes').insert([{ aluno_id: alunoId, valor, descricao, tipo, created_at: new Date() }]);
             return true;
         }
 
@@ -281,25 +281,31 @@
                 header: true,
                 skipEmptyLines: true,
                 complete: async (results) => {
+                    let inserted = 0;
+                    let errors = [];
                     for (let row of results.data) {
                         if (!row.matricula || !row.nome) continue;
-                        await supabase.from('banco_alunos').insert([{ 
-                            matricula: row.matricula, 
-                            nome: row.nome, 
-                            escola: row.escola, 
-                            serie: row.serie, 
-                            turma: row.turma, 
-                            saldo: 0, 
-                            total_gasto: 0 
+                        if (!escolasList.includes(row.escola)) { errors.push(`Escola inválida: ${row.escola}`); continue; }
+                        if (!seriesList.includes(row.serie)) { errors.push(`Série inválida: ${row.serie}`); continue; }
+                        if (!turmasList.includes(row.turma)) { errors.push(`Turma inválida: ${row.turma}`); continue; }
+                        const { error } = await supabase.from('banco_alunos').insert([{
+                            matricula: row.matricula,
+                            nome: row.nome,
+                            escola: row.escola,
+                            serie: row.serie,
+                            turma: row.turma,
+                            saldo: 0,
+                            total_gasto: 0
                         }]);
+                        if (error) errors.push(`Erro ${row.matricula}: ${error.message}`);
+                        else inserted++;
                     }
-                    alert('Importação concluída');
+                    alert(`Importação concluída: ${inserted} inseridos.\nErros: ${errors.length}\n${errors.slice(0,5).join('\n')}`);
                     carregarAlunos();
                 }
             });
         }
 
-        // ================== ÁREA DO ALUNO ==================
         async function carregarDadosAluno(id) {
             const { data: aluno } = await supabase.from('banco_alunos').select('*').eq('id', id).single();
             if (!aluno) return;
@@ -332,7 +338,7 @@
                         if (sucesso) {
                             await carregarDadosAluno(id);
                             await carregarExtratoAluno(id);
-                            alert('Compra realizada com sucesso! Acesse a atividade no seu e-mail.');
+                            alert('Compra realizada com sucesso!');
                         }
                     } else {
                         alert('Saldo insuficiente!');
@@ -353,7 +359,7 @@
             container.innerHTML += '</div>';
         }
 
-        // ================== AUTENTICAÇÃO ==================
+        // Autenticação
         async function professorLogin(email, password) {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) { alert('Login falhou: ' + error.message); return false; }
@@ -378,7 +384,7 @@
             return true;
         }
 
-        // ================== EVENTOS ==================
+        // Event listeners
         document.getElementById('showProfessorLoginBtn').onclick = () => {
             document.getElementById('professorLoginForm').style.display = 'block';
             document.getElementById('studentLoginForm').style.display = 'none';
