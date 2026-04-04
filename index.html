@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Banco Escolar · Créditos Educacionais</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -79,7 +79,7 @@
                     <h3>➕ Cadastrar Aluno</h3>
                     <input type="text" id="matricula" placeholder="Matrícula">
                     <input type="text" id="nome" placeholder="Nome">
-                    <select id="escola"><option value="">Escola</option></select>
+                    <select id="escola"><option value="">Selecione a Escola</option></select>
                     <select id="serie"><option value="">Série/Ano</option></select>
                     <select id="turma"><option value="">Turma</option></select>
                     <button id="addStudentBtn">Salvar</button>
@@ -143,9 +143,8 @@
 <script>
     (function() {
         // ==================== CONFIGURAÇÃO SUPABASE ====================
-        // ATENÇÃO: Substitua pelos seus dados!
-        const SUPABASE_URL = 'https://nxclpnwknnwozftvnxiu.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_B_C4Ucu_f52d_MX1MScp3Q_HwyabAuq';
+        const SUPABASE_URL = 'https://bkydyeighbcaabledgxj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_aO9_8D0TQTyXBjteTXORQQ_hDZQa91z';
         // =================================================================
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -158,14 +157,80 @@
         const studentPanel = document.getElementById('studentPanel');
         const userNameDisplay = document.getElementById('userNameDisplay');
 
-        // Listas para selects
+        // ==================== LISTA COMPLETA DE ESCOLAS ====================
         const escolasList = [
-            "E.E. ADAIL JARBAS DUCLOS", "E.E. AFONSO MORENO", "E.E. ALADINO POLON", "E.E. ALBERTO GRAF – CAPITÃO",
-            "E.E. ALBINO FIORE", "E.E. ALFRIED THEODOR WEISZFLOG", "E.E. ANA MARIA GARRIDO ORLANDIN – PROF.ª",
-            "E.E. APARECIDO ROBERTO TONELLOTTI – PROF.", "E.E. ARMANDO SESTINI", "E.E. ARTHUR WEINGRILL"
+            "E.E. ADAIL JARBAS DUCLOS",
+            "E.E. AFONSO MORENO",
+            "E.E. ALADINO POLON",
+            "E.E. ALBERTO GRAF – CAPITÃO",
+            "E.E. ALBINO FIORE",
+            "E.E. ALFRIED THEODOR WEISZFLOG",
+            "E.E. ANA MARIA GARRIDO ORLANDIN – PROF.ª",
+            "E.E. APARECIDO ROBERTO TONELLOTTI – PROF.",
+            "E.E. ARMANDO SESTINI",
+            "E.E. ARTHUR WEINGRILL",
+            "E.E. AZEVEDO SOARES",
+            "E.E. BAIRRO DO ITAIM",
+            "E.E. BAIRRO JUNDIAIZINHO",
+            "E.E. BELÉM DA SERRA",
+            "E.E. BENEDITO APARECIDO TAVARES – PROF.",
+            "E.E. BENEDITO FAGUNDES MARQUES",
+            "E.E. BUENO DE AZEVEDO FILHO – PROF.",
+            "E.E. CARLOS AUGUSTO DE PÁDUA FLEURY – PROF.",
+            "E.E. CELESTINA VALENTE LENGENFELDER – PROF.ª",
+            "E.E. CHÁCARA CAMPONESA/ Jd Vassouras",
+            "E.E. DOMINGOS CAMBIAGHI – PROF.",
+            "E.E. ÉLCIO JOSÉ PEREIRA COTRIM – PROF.",
+            "E.E. ELVIRA PARADA MANGA – PROF.ª",
+            "E.E. FRANCISCO GONÇALVES VIEIRA – PROFº",
+            "E.E. HERMELINA DE ALBUQUERQUE PASSARELLA – PROF.ª",
+            "E.E. IRACI SARTORI VIEIRA DA SILVA – PROF.ª",
+            "E.E. ISAÍAS LUIZ MATIAZZO",
+            "E.E. ISAURA DE MIRANDA BOTTO – PROFª",
+            "E.E. ISAURA VALENTINI HANSER – PROFª",
+            "E.E. IVONE DOS ANJOS DA SILVA CAMPOS – PROF.ª",
+            "E.E. JARDIM ALEGRIA II",
+            "E.E. JARDIM DAS ROSAS",
+            "E.E. JARDIM SÃO FRANCISCO",
+            "E.E. JARDIM SILVIA II",
+            "E.E. JOAQUIM MARQUES DA SILVA SOBRINHO – TTE.",
+            "E.E. JOCIMARA VIEIRA DA SILVA – PROF.ª",
+            "E.E. JOSÉ CARLOS DA SILVA JUNIOR",
+            "E.E. JOSÉ DE BARROS MARTINS – EDITOR",
+            "E.E. JOSÉ PARADA – PROF.",
+            "E.E. JOSÉ ROBERTO MELCHIOR – DR.",
+            "E.E. KÁTIA MARIA TARIFA LEME TONELLI – PROF.ª",
+            "E.E. LENITA CORRÊA CAMARGO – PROF.ª",
+            "E.E. LUIZ ALEXANDRE DOS SANTOS – VEREADOR",
+            "E.E. LYDIA SCALET WALKER – PROF.ª",
+            "E.E. MARIA ZEZA GOMES DE OLIVEIRA",
+            "E.E. MARIO TOLEDO DE MORAES – DR.",
+            "E.E. NAIR HANNICKEL ROMARO",
+            "E.E. NELSON MANZANARES – DR.",
+            "E.E. NIDE ZAIM CARDOSO – PROF.ª",
+            "E.E. ODARICO OLIVEIRA NASCIMENTO – PROF.",
+            "E.E. OTTO WEISZFLOG",
+            "E.E. OZILDE ALBUQUERQUE PASSARELLA – DR.",
+            "E.E. PARQUE CENTO E VINTE II",
+            "E.E. PAULO DUARTE",
+            "E.E. PEDRO GALRÃO DO NASCIMENTO",
+            "E.E. PEDRO LELIS DE SOUZA – PREFEITO",
+            "E.E. PEDRO PAULO AGUIAR",
+            "E.E. PIETRO PETRI",
+            "E.E. RITUCO MITANI – PROF.ª",
+            "E.E. ROGÉRIO LEVORIN – PROF.",
+            "E.E. SUZANA DIAS",
+            "E.E. ULYSSES SANCHES RAMIRES – PROF.",
+            "E.E. VINCENZO LOBASSI",
+            "E.E. WALTER RIBAS DE ANDRADE – PROF.",
+            "E.E. WALTHER WEISZFLOG",
+            "E.E. ZILTON BICUDO – PROF.",
+            "E.E. OLINDO DÁRTORA – DR."
         ];
+        // =====================================================================
+
         const seriesList = ["6º Ano", "7º Ano", "8º Ano", "9º Ano", "1ª Série EM", "2ª Série EM", "3ª Série EM"];
-        const turmasList = ["A", "B", "C", "D", "E", "G", "H", "I"];
+        const turmasList = ["A", "B", "C", "D", "E", "G", "H", "I", "J", "L", "M", "N", "O", "P", "Q", "R", "S"];
 
         function populateSelects() {
             const escolaSelect = document.getElementById('escola');
